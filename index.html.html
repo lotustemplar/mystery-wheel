@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mystery Prize Wheel - Spin to Win!</title>
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      font-family: 'Orbitron', sans-serif;
+    }
+    
+    @keyframes glow-pulse {
+      0%, 100% { filter: brightness(1) drop-shadow(0 0 20px currentColor); }
+      50% { filter: brightness(1.5) drop-shadow(0 0 40px currentColor); }
+    }
+    
+    @keyframes marqueeBlink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+    
+    @keyframes rotateGold {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes shine {
+      0% { transform: translateX(-100%) rotate(45deg); }
+      100% { transform: translateX(200%) rotate(45deg); }
+    }
+    
+    @keyframes confetti {
+      0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    
+    // ========================================
+    // CONFIGURATION
+    // ========================================
+    
+    const API_URL = 'https://mystery-wheel-backend-mystery-wheel.up.railway.app';
+```
+
+5. **Save the file**
+
+---
+
+### **STEP 2: Upload to Cloudflare Pages (FREE)**
+
+**Easiest hosting option:**
+
+1. **Go to:** https://pages.cloudflare.com
+2. **Sign up/Sign in** (free account)
+3. **Click "Create a project"**
+4. **Click "Upload assets"**
+5. **Give it a name:** `mystery-wheel`
+6. **Rename your file to:** `index.html`
+7. **Upload the file**
+8. **Click "Deploy site"**
+
+**You'll get a URL like:**
+```
+https://mystery-wheel.pages.dev'; // Will be replaced with Railway URL
+    
+    const PRIZE_TYPES = [
+      { id: 1, name: "Legendary Box", value: 80, displayValue: "$80+ VALUE", display: "$80", color: "#8b0000", weight: 0.15, stock: 1, packs: 1 },
+      { id: 2, name: "Mythic Bundle", value: 35, displayValue: "$35+ VALUE", display: "$35", color: "#4b0082", weight: 1.5, stock: 5, packs: 1 },
+      { id: 3, name: "Rare 3-Pack", value: 15, displayValue: "$15+ VALUE", display: "3X", color: "#006400", weight: 12, stock: 20, packs: 3 },
+      { id: 4, name: "Uncommon 2-Pack", value: 10, displayValue: "$10+ VALUE", display: "2X", color: "#b8860b", weight: 26, stock: 30, packs: 2 },
+      { id: 5, name: "Common Pack", value: 5, displayValue: "$5+ VALUE", display: "1X", color: "#2f4f4f", weight: 60.35, stock: 100, packs: 1 }
+    ];
+    
+    const createWheelSegments = (prizeTypes) => {
+      const segments = [];
+      segments.push({ ...prizeTypes[0], segmentId: 's1' });
+      segments.push({ ...prizeTypes[1], segmentId: 's2' });
+      for (let i = 0; i < 3; i++) segments.push({ ...prizeTypes[2], segmentId: `s3-${i}` });
+      for (let i = 0; i < 5; i++) segments.push({ ...prizeTypes[3], segmentId: `s4-${i}` });
+      for (let i = 0; i < 10; i++) segments.push({ ...prizeTypes[4], segmentId: `s5-${i}` });
+      return segments.sort(() => Math.random() - 0.5);
+    };
+    
+    // ========================================
+    // MAIN COMPONENT
+    // ========================================
+    
+    function MysteryWheel() {
+      const [gameState, setGameState] = useState('loading'); // loading, ready, spinning, won, summary, error
+      const [sessionToken, setSessionToken] = useState(null);
+      const [customerName, setCustomerName] = useState('');
+      const [spinsRemaining, setSpinsRemaining] = useState(0);
+      const [spinning, setSpinning] = useState(false);
+      const [wonPrize, setWonPrize] = useState(null);
+      const [allPrizes, setAllPrizes] = useState([]);
+      const [rotation, setRotation] = useState(0);
+      const [prizeStock, setPrizeStock] = useState(PRIZE_TYPES);
+      const [wheelSegments] = useState(createWheelSegments(PRIZE_TYPES));
+      const [glowingSegment, setGlowingSegment] = useState(null);
+      const [errorMessage, setErrorMessage] = useState('');
+      
+      const audioContext = useRef(null);
+      const tickInterval = useRef(null);
+      
+      useEffect(() => {
+        audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+        initializeSession();
+      }, []);
+      
+      // ========================================
+      // SESSION INITIALIZATION
+      // ========================================
+      
+      const initializeSession = async () => {
+        try {
+          // Get session token from URL parameter
+          const urlParams = new URLSearchParams(window.location.search);
+          const token = urlParams.get('session');
+          
+          if (!token) {
+            setErrorMessage('No session token found. Please purchase spins first!');
+            setGameState('error');
+            return;
+          }
+          
+          // Verify session with backend
+          const response = await fetch(`${API_URL}/api/session/${token}`);
+          
+          if (!response.ok) {
+            setErrorMessage('Invalid or expired session. Please contact support.');
+            setGameState('error');
+            return;
+          }
+          
+          const data = await response.json();
+          
+          setSessionToken(token);
+          setCustomerName(data.customerName);
+          setSpinsRemaining(data.spinsRemaining);
+          
+          if (data.status === 'completed') {
+            setGameState('summary');
+          } else {
+            setGameState('ready');
+          }
+          
+        } catch (error) {
+          console.error('Session init error:', error);
+          setErrorMessage('Failed to load session. Please try again.');
+          setGameState('error');
+        }
+      };
+      
+      // ========================================
+      // SOUND EFFECTS
+      // ========================================
+      
+      const playTick = (pitch = 800) => {
+        if (!audioContext.current) return;
+        const osc = audioContext.current.createOscillator();
+        const gain = audioContext.current.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.current.destination);
+        osc.frequency.value = pitch;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.15, audioContext.current.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.current.currentTime + 0.08);
+        osc.start();
+        osc.stop(audioContext.current.currentTime + 0.08);
+      };
+      
+      const playWinSound = () => {
+        if (!audioContext.current) return;
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+          setTimeout(() => {
+            const osc = audioContext.current.createOscillator();
+            const gain = audioContext.current.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.current.destination);
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, audioContext.current.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.current.currentTime + 0.5);
+            osc.start();
+            osc.stop(audioContext.current.currentTime + 0.5);
+          }, i * 150);
+        });
+      };
+      
+      // ========================================
+      // PRIZE SELECTION
+      // ========================================
+      
+      const selectPrize = () => {
+        const available = prizeStock.filter(p => p.stock > 0);
+        const totalWeight = available.reduce((sum, p) => sum + p.weight, 0);
+        let random = Math.random() * totalWeight;
+        for (const prize of available) {
+          random -= prize.weight;
+          if (random <= 0) return prize;
+        }
+        return available[0];
+      };
+      
+      // ========================================
+      // SPIN LOGIC
+      // ========================================
+      
+      const spin = async () => {
+        if (spinning || spinsRemaining === 0) return;
+        
+        setSpinning(true);
+        setWonPrize(null);
+        setGameState('spinning');
+        
+        const prize = selectPrize();
+        if (!prize) return;
+        
+        const matchingSegments = wheelSegments
+          .map((seg, idx) => ({ seg, idx }))
+          .filter(({ seg }) => seg.id === prize.id);
+        
+        if (matchingSegments.length === 0) {
+          setSpinning(false);
+          return;
+        }
+        
+        const randomMatch = matchingSegments[Math.floor(Math.random() * matchingSegments.length)];
+        const targetIndex = randomMatch.idx;
+        
+        const segmentAngle = 360 / wheelSegments.length;
+        const targetAngle = 360 - (targetIndex * segmentAngle + (segmentAngle / 2));
+        const spins = 8 + Math.random() * 4;
+        const currentRotation = rotation % 360;
+        const finalRotation = rotation + (360 * spins) + (targetAngle - currentRotation);
+        
+        setRotation(finalRotation);
+        
+        let tickSpeed = 50;
+        let currentTick = 0;
+        const maxTicks = 80;
+        const startRotation = rotation;
+        
+        tickInterval.current = setInterval(() => {
+          if (currentTick >= maxTicks) {
+            clearInterval(tickInterval.current);
+            return;
+          }
+          
+          const progress = currentTick / maxTicks;
+          tickSpeed = 50 + (progress * progress * 400);
+          const pitch = 1200 - (progress * 600);
+          playTick(pitch);
+          
+          const currentSpinRotation = startRotation + (finalRotation - startRotation) * progress;
+          const normalizedRotation = ((360 - (currentSpinRotation % 360)) + 360) % 360;
+          const currentSegment = Math.floor(normalizedRotation / segmentAngle) % wheelSegments.length;
+          setGlowingSegment(currentSegment);
+          
+          currentTick++;
+        }, tickSpeed);
+        
+        setTimeout(async () => {
+          clearInterval(tickInterval.current);
+          
+          const finalNormalizedRotation = ((360 - (finalRotation % 360)) + 360) % 360;
+          const landedSegmentIndex = Math.floor(finalNormalizedRotation / segmentAngle) % wheelSegments.length;
+          const landedSegment = wheelSegments[landedSegmentIndex];
+          const actualPrize = prizeStock.find(p => p.id === landedSegment.id);
+          
+          setGlowingSegment(landedSegmentIndex);
+          
+          setTimeout(async () => {
+            playWinSound();
+            
+            // Record spin with backend
+            try {
+              const response = await fetch(`${API_URL}/api/record-spin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sessionToken,
+                  prizeId: actualPrize.id,
+                  prizeName: actualPrize.name,
+                  prizeValue: actualPrize.value
+                })
+              });
+              
+              const data = await response.json();
+              
+              setSpinsRemaining(data.spinsRemaining);
+              setAllPrizes(prev => [...prev, actualPrize]);
+              
+            } catch (error) {
+              console.error('Error recording spin:', error);
+            }
+            
+            setPrizeStock(prev => prev.map(p => 
+              p.id === actualPrize.id ? { ...p, stock: p.stock - 1 } : p
+            ));
+            
+            setWonPrize(actualPrize);
+            setSpinning(false);
+            setGameState('won');
+            setGlowingSegment(null);
+            
+          }, 500);
+        }, 7000);
+      };
+      
+      // ========================================
+      // CONTINUE/FINISH
+      // ========================================
+      
+      const continueToNextSpin = () => {
+        setWonPrize(null);
+        if (spinsRemaining > 0) {
+          setGameState('ready');
+        } else {
+          finalizePrizes();
+        }
+      };
+      
+      const finalizePrizes = async () => {
+        setGameState('loading');
+        
+        try {
+          const response = await fetch(`${API_URL}/api/finalize-spins`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken })
+          });
+          
+          const data = await response.json();
+          
+          setGameState('summary');
+          
+        } catch (error) {
+          console.error('Error finalizing:', error);
+          setErrorMessage('Failed to create order. Please contact support with your session ID.');
+          setGameState('error');
+        }
+      };
+      
+      const segmentAngle = 360 / wheelSegments.length;
+      
+      // ========================================
+      // RENDER
+      // ========================================
+      
+      if (gameState === 'loading') {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2rem'
+          }}>
+            Loading... 🎰
+          </div>
+        );
+      }
+      
+      if (gameState === 'error') {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%)',
+            color: 'white',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem'
+          }}>
+            <div style={{ fontSize: '4rem', marginBottom: '2rem' }}>⚠️</div>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: '#ff0844' }}>Error</h1>
+            <p style={{ fontSize: '1.2rem', textAlign: 'center', maxWidth: '600px' }}>
+              {errorMessage}
+            </p>
+          </div>
+        );
+      }
+      
+      if (gameState === 'summary') {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1a1f2e, #0a0e1a)',
+              border: '4px solid #ffd700',
+              borderRadius: '24px',
+              padding: '3rem',
+              maxWidth: '700px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>🎉</div>
+              
+              <h1 style={{
+                fontSize: '3rem',
+                fontWeight: 900,
+                background: 'linear-gradient(135deg, #ffd700, #ff6b00)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: '2rem'
+              }}>
+                CONGRATULATIONS!
+              </h1>
+              
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '2rem', color: '#00d9ff' }}>
+                You Won:
+              </h2>
+              
+              {allPrizes.map((prize, i) => (
+                <div key={i} style={{
+                  background: 'rgba(255, 215, 0, 0.1)',
+                  border: `2px solid ${prize.color}`,
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: prize.color }}>
+                    {prize.displayValue}
+                  </div>
+                  <div style={{ fontSize: '1.2rem', marginTop: '0.5rem' }}>
+                    {prize.name}
+                  </div>
+                  {prize.packs > 1 && (
+                    <div style={{ fontSize: '1rem', color: '#00ff88', marginTop: '0.5rem' }}>
+                      🎁 {prize.packs} Packs!
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              <div style={{
+                marginTop: '3rem',
+                padding: '2rem',
+                background: 'rgba(0, 255, 136, 0.1)',
+                border: '2px solid #00ff88',
+                borderRadius: '12px'
+              }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#00ff88', marginBottom: '1rem' }}>
+                  ✅ ORDER CREATED!
+                </div>
+                <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>
+                  Your prizes will be shipped to you within 2-3 business days.<br/>
+                  Check your email for order confirmation!
+                </p>
+              </div>
+              
+              <div style={{
+                marginTop: '2rem',
+                fontSize: '0.9rem',
+                color: 'rgba(255,255,255,0.6)'
+              }}>
+                Thank you for playing! 🎰
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%)',
+          color: 'white',
+          padding: '2rem',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: `
+              radial-gradient(circle at 20% 50%, rgba(0, 217, 255, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 80% 50%, rgba(180, 0, 255, 0.1) 0%, transparent 50%)
+            `,
+            pointerEvents: 'none'
+          }} />
+          
+          <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+            
+            <h1 style={{
+              textAlign: 'center',
+              fontSize: 'clamp(2rem, 6vw, 4rem)',
+              fontWeight: 900,
+              background: 'linear-gradient(135deg, #ffd700, #ff6b00)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              marginBottom: '1rem'
+            }}>
+              🎰 MYSTERY PRIZE WHEEL 🎰
+            </h1>
+            
+            {customerName && (
+              <div style={{
+                textAlign: 'center',
+                fontSize: '1.2rem',
+                color: '#00d9ff',
+                marginBottom: '2rem'
+              }}>
+                Welcome, {customerName}!
+              </div>
+            )}
+            
+            <div style={{
+              textAlign: 'center',
+              fontSize: '2rem',
+              fontWeight: 900,
+              marginBottom: '2rem',
+              color: spinsRemaining > 0 ? '#00ff88' : '#ff0844'
+            }}>
+              {spinsRemaining} {spinsRemaining === 1 ? 'SPIN' : 'SPINS'} REMAINING
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+              
+              <div style={{ 
+                position: 'relative', 
+                width: '600px', 
+                height: '600px',
+                filter: spinning ? 'drop-shadow(0 0 60px rgba(255, 215, 0, 0.8))' : 'drop-shadow(0 30px 60px rgba(255, 215, 0, 0.3))'
+              }}>
+                
+                {/* Marquee lights */}
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'absolute',
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, #fff, #ffd700)',
+                      boxShadow: '0 0 20px #ffd700',
+                      left: '50%',
+                      top: '50%',
+                      transform: `translate(-50%, -50%) rotate(${i * 15}deg) translateY(-320px)`,
+                      animation: `marqueeBlink 1s ease-in-out infinite`,
+                      animationDelay: `${i * 0.05}s`
+                    }}
+                  />
+                ))}
+                
+                {/* Pointer */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-40px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10,
+                  width: '60px',
+                  height: '60px',
+                  background: 'linear-gradient(135deg, #ffd700, #ffed4e, #ffd700)',
+                  clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
+                  boxShadow: '0 4px 20px rgba(255, 215, 0, 0.8)',
+                  border: '3px solid #b8860b',
+                  animation: spinning ? 'glow-pulse 0.5s infinite' : 'none'
+                }} />
+                
+                {/* Rotating gold ring */}
+                <div style={{
+                  position: 'absolute',
+                  inset: '-20px',
+                  borderRadius: '50%',
+                  background: 'conic-gradient(from 0deg, #ffd700, #ffed4e, #ffd700, #b8860b, #ffd700)',
+                  animation: 'rotateGold 20s linear infinite',
+                  opacity: 0.4
+                }} />
+                
+                {/* Main wheel */}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    position: 'relative',
+                    boxShadow: `
+                      0 0 0 12px #ffd700,
+                      0 0 0 16px #b8860b,
+                      0 0 0 20px #ffd700,
+                      0 0 40px rgba(255, 215, 0, 0.5)
+                    `,
+                    background: 'radial-gradient(circle at center, #2a1810 0%, #1a1008 100%)',
+                    transform: `rotate(${rotation}deg)`,
+                    transition: spinning ? 'transform 7s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'transform 0.5s ease-out',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {/* SVG segments */}
+                  <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                    {wheelSegments.map((prize, index) => {
+                      const startAngle = index * segmentAngle;
+                      const endAngle = (index + 1) * segmentAngle;
+                      const startRad = (startAngle * Math.PI) / 180;
+                      const endRad = (endAngle * Math.PI) / 180;
+                      const x1 = 50 + 50 * Math.cos(startRad);
+                      const y1 = 50 + 50 * Math.sin(startRad);
+                      const x2 = 50 + 50 * Math.cos(endRad);
+                      const y2 = 50 + 50 * Math.sin(endRad);
+                      const largeArc = segmentAngle > 180 ? 1 : 0;
+                      const path = `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArc} 1 ${x2} ${y2} Z`;
+                      const isGlowing = glowingSegment === index;
+                      const prizeData = prizeStock.find(p => p.id === prize.id);
+                      
+                      const colors = {
+                        1: { bg: '#8b0000', accent: '#ff0000' },
+                        2: { bg: '#4b0082', accent: '#9400d3' },
+                        3: { bg: '#006400', accent: '#00ff00' },
+                        4: { bg: '#b8860b', accent: '#ffd700' },
+                        5: { bg: '#2f4f4f', accent: '#5f9ea0' }
+                      };
+                      
+                      const color = colors[prize.id];
+                      
+                      return (
+                        <path
+                          key={prize.segmentId}
+                          d={path}
+                          fill={isGlowing ? color.accent : color.bg}
+                          stroke="#ffd700"
+                          strokeWidth="0.3"
+                          opacity={prizeData.stock > 0 ? 1 : 0.3}
+                          style={{
+                            filter: isGlowing ? `brightness(1.5) drop-shadow(0 0 5px ${color.accent})` : 'brightness(1)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        />
+                      );
+                    })}
+                  </svg>
+                  
+                  {/* Text overlays */}
+                  {wheelSegments.map((prize, index) => {
+                    const angle = index * segmentAngle + segmentAngle / 2;
+                    
+                    const textMap = {
+                      '$80': 'L\nE\nG\nE\nN\nD\nA\nR\nY',
+                      '$35': 'M\nY\nT\nH\nI\nC',
+                      '3X': 'R\nA\nR\nE\n\n3\nX',
+                      '2X': 'U\nN\nC\nO\nM\nM\nO\nN\n\n2\nX',
+                      '1X': 'C\nO\nM\nM\nO\nN\n\n1\nX'
+                    };
+                    
+                    const verticalText = textMap[prize.display];
+                    
+                    return (
+                      <div
+                        key={`text-${prize.segmentId}`}
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: '50%',
+                          transform: `rotate(${angle}deg) translateY(-270px)`,
+                          transformOrigin: '0 0',
+                          textAlign: 'center',
+                          pointerEvents: 'none',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}
+                      >
+                        {verticalText.split('\n').map((char, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              fontSize: char === '' ? '0.5rem' : char.match(/[0-9]/) ? '1.2rem' : '0.85rem',
+                              fontWeight: 900,
+                              color: '#ffd700',
+                              textShadow: '0 0 8px #ffd700, 0 2px 4px rgba(0,0,0,0.9)',
+                              lineHeight: 1,
+                              letterSpacing: '1px',
+                              height: char === '' ? '6px' : 'auto'
+                            }}
+                          >
+                            {char}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Center hub */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '50%',
+                    background: `radial-gradient(circle at 30% 30%, #ffd700, #b8860b 50%, #8b6914)`,
+                    border: '6px solid #fff',
+                    boxShadow: `
+                      0 0 0 4px #ffd700,
+                      0 10px 40px rgba(0, 0, 0, 0.5)
+                    `,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    zIndex: 10
+                  }}>
+                    💎
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={spin}
+                disabled={spinning || spinsRemaining === 0}
+                style={{
+                  padding: '1.5rem 4rem',
+                  fontSize: '1.5rem',
+                  fontWeight: 900,
+                  background: spinning || spinsRemaining === 0 ? '#555' : 'linear-gradient(135deg, #ffd700, #ff6b00)',
+                  border: 'none',
+                  borderRadius: '100px',
+                  color: spinning || spinsRemaining === 0 ? 'white' : 'black',
+                  cursor: spinning || spinsRemaining === 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: spinning || spinsRemaining === 0 ? 'none' : '0 10px 40px rgba(255, 215, 0, 0.5)',
+                  transition: 'all 0.3s',
+                  fontFamily: 'inherit',
+                  opacity: spinning || spinsRemaining === 0 ? 0.5 : 1
+                }}
+              >
+                {spinning ? '⚡ SPINNING... ⚡' : 
+                 spinsRemaining === 0 ? 'NO SPINS LEFT' : 
+                 '🎰 SPIN NOW!'}
+              </button>
+            </div>
+          </div>
+          
+          {/* Win modal */}
+          {wonPrize && gameState === 'won' && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #0a0e1a, #1a1f2e)',
+                border: `4px solid ${wonPrize.color}`,
+                borderRadius: '24px',
+                padding: '3rem',
+                maxWidth: '500px',
+                textAlign: 'center',
+                boxShadow: `0 20px 60px ${wonPrize.color}80`
+              }}>
+                <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>🎉</div>
+                
+                <h2 style={{
+                  fontSize: '2.5rem',
+                  fontWeight: 900,
+                  color: wonPrize.color,
+                  marginBottom: '1rem',
+                  textShadow: `0 0 20px ${wonPrize.color}`
+                }}>
+                  YOU WON!
+                </h2>
+                
+                <div style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '0.5rem' }}>
+                  {wonPrize.displayValue}
+                </div>
+                
+                <div style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'rgba(255,255,255,0.8)' }}>
+                  {wonPrize.name}
+                </div>
+                
+                {wonPrize.packs > 1 && (
+                  <div style={{ 
+                    fontSize: '1.25rem', 
+                    marginBottom: '2rem', 
+                    color: '#00ff88',
+                    fontWeight: 700
+                  }}>
+                    🎁 {wonPrize.packs} PACKS! 🎁
+                  </div>
+                )}
+                
+                <button
+                  onClick={continueToNextSpin}
+                  style={{
+                    padding: '1rem 2rem',
+                    background: 'linear-gradient(135deg, #00d9ff, #00ff88)',
+                    border: 'none',
+                    borderRadius: '100px',
+                    color: 'black',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '1rem',
+                    marginTop: '1rem'
+                  }}
+                >
+                  {spinsRemaining > 0 ? `✅ CONTINUE (${spinsRemaining} LEFT)` : '🎁 SEE ALL PRIZES'}
+                </button>
+              </div>
+            </div>
+          )}
+          
+        </div>
+      );
+    }
+    
+    ReactDOM.render(<MysteryWheel />, document.getElementById('root'));
+  </script>
+</body>
+</html>
