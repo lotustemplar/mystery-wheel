@@ -109,6 +109,37 @@
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const token = urlParams.get('session');
+          const orderNumber = urlParams.get('order');
+          
+          // If we have an order number but no session, create one
+          if (orderNumber && !token) {
+            try {
+              const createResponse = await fetch(`${API_URL}/api/create-spin-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderNumber })
+              });
+              
+              if (!createResponse.ok) {
+                setErrorMessage('Could not create spin session. Please contact support.');
+                setGameState('error');
+                return;
+              }
+              
+              const createData = await createResponse.json();
+              
+              if (createData.success) {
+                // Redirect to the same page with the session token
+                window.location.href = `${window.location.pathname}?session=${createData.sessionToken}`;
+                return;
+              }
+            } catch (error) {
+              console.error('Error creating session:', error);
+              setErrorMessage('Failed to create session. Please contact support.');
+              setGameState('error');
+              return;
+            }
+          }
           
           if (!token) {
             setErrorMessage('No session token found. Please purchase spins first!');
