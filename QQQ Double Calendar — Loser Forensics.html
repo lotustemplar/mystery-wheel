@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<!-- saved from url=(0052)file:///C:/Users/filip/Downloads/trade_analysis.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQQ Double Calendar — Loser Forensics</title>
+<link href="./QQQ Double Calendar — Loser Forensics_files/css2" rel="stylesheet">
+<script src="./QQQ Double Calendar — Loser Forensics_files/chart.umd.min.js.download"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0c10;--surface:#12151c;--surface2:#1a1e28;--surface3:#222736;--border:#2a3040;--text:#e0e4ec;--dim:#7a8494;--accent:#58e0a0;--red:#ff5c6c;--orange:#ffaa44;--yellow:#ffd644;--blue:#5cacff;--green:#58e0a0;--purple:#b48cff}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+.hero{padding:48px 40px 32px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#0f121a 0%,var(--bg) 100%)}
+.hero h1{font-size:32px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+.hero h1 span{color:var(--accent)}
+.hero .sub{color:var(--dim);font-size:14px}
+.hero .stats-row{display:flex;gap:32px;margin-top:24px;flex-wrap:wrap}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 24px;min-width:160px}
+.stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:4px}
+.stat-card .val{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.stat-card .val.green{color:var(--green)}.stat-card .val.red{color:var(--red)}.stat-card .val.blue{color:var(--blue)}
+.container{max-width:1400px;margin:0 auto;padding:24px 40px 60px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:24px}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.section{margin-bottom:40px}
+.section-title{font-size:20px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.section-title .badge{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;padding:4px 10px;border-radius:6px;font-weight:600}
+.badge-red{background:var(--red);color:#000}.badge-green{background:var(--green);color:#000}.badge-blue{background:var(--blue);color:#000}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.card.danger::before{background:var(--red)}.card.success::before{background:var(--green)}.card.info::before{background:var(--blue)}.card.warn::before{background:var(--orange)}
+.card h3{font-size:15px;font-weight:600;margin-bottom:14px;color:var(--text)}
+.card .insight{font-size:13px;color:var(--dim);line-height:1.7;margin-top:12px}
+.card .insight strong{color:var(--text)}
+.highlight{display:inline-block;padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
+.hl-red{background:#ff5c6c20;color:var(--red)}.hl-green{background:#58e0a020;color:var(--green)}.hl-orange{background:#ffaa4420;color:var(--orange)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);font-weight:600}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.num{font-family:'JetBrains Mono',monospace;font-size:12px}
+.pos{color:var(--green)}.neg{color:var(--red)}.warn-text{color:var(--orange)}
+.chart-wrap{position:relative;height:280px;margin-top:8px}
+.finding{background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:16px 20px;margin:12px 0;font-size:13px;line-height:1.7}
+.finding.bad{border-left-color:var(--red)}.finding.caution{border-left-color:var(--orange)}
+.finding .num-big{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-right:6px}
+.golden-box{background:linear-gradient(135deg,#58e0a010,#ffd64410);border:2px solid #58e0a040;border-radius:16px;padding:32px;margin:32px 0}
+.golden-box h2{font-size:24px;margin-bottom:16px;color:var(--yellow)}
+.golden-box .compare{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}
+.golden-box .compare-card{background:var(--surface);border-radius:12px;padding:20px;text-align:center}
+.golden-box .compare-card .label{font-size:12px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.golden-box .compare-card .big{font-size:36px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.rule{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative}
+.rule .rule-num{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:50%;background:var(--red);color:#000;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.rule h4{font-size:14px;margin-bottom:8px;padding-right:36px}
+.rule p{font-size:12px;color:var(--dim);line-height:1.6}
+.rule .impact{margin-top:10px;font-size:12px;font-weight:600;color:var(--red);font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>QQQ Double Calendar <span>Loser Forensics</span></h1>
+  <p class="sub">487 trades · Jan 2023 — Mar 2026 · Deep pattern analysis to eliminate recurring mistakes</p>
+  <div class="stats-row">
+    <div class="stat-card"><div class="label">Total Trades</div><div class="val blue">487</div></div>
+    <div class="stat-card"><div class="label">Win Rate</div><div class="val green">70.6%</div></div>
+    <div class="stat-card"><div class="label">Losers</div><div class="val red">143</div></div>
+    <div class="stat-card"><div class="label">Avg Winner</div><div class="val green">+15.9%</div></div>
+    <div class="stat-card"><div class="label">Avg Loser</div><div class="val red">-11.5%</div></div>
+    <div class="stat-card"><div class="label">Total P/L</div><div class="val green">$733K</div></div>
+  </div>
+</div>
+<div class="container">
+
+<!-- FOMC -->
+<div class="section">
+  <div class="section-title">1 · FOMC Impact <span class="badge badge-red">CRITICAL</span></div>
+  <div class="grid-2">
+    <div class="card danger">
+      <h3>Opening Trades on FOMC Day</h3>
+      <div class="chart-wrap"><canvas id="fomcChart" width="598" height="280" style="display: block; box-sizing: border-box; height: 280px; width: 598px;"></canvas></div>
+      <div class="insight">Trades opened <strong>on FOMC announcement day</strong> have a <span class="highlight hl-red">50% loss rate</span> vs 28.8% normally. Avg P/L drops to just +2.36% vs +8.00%.</div>
+    </div>
+    <div class="card info">
+      <h3>FOMC Week Breakdown</h3>
+      <table>
+        <tbody><tr><th>Scenario</th><th>Trades</th><th>Win Rate</th><th>Avg P/L%</th><th>Loser %</th></tr>
+        <tr><td>FOMC Day Open</td><td class="num">14</td><td class="num neg">50.0%</td><td class="num neg">+2.4%</td><td class="num neg">50.0%</td></tr>
+        <tr><td>FOMC Week</td><td class="num">76</td><td class="num warn-text">65.8%</td><td class="num warn-text">+4.9%</td><td class="num warn-text">34.2%</td></tr>
+        <tr><td>Day Before FOMC</td><td class="num">13</td><td class="num pos">92.3%</td><td class="num pos">+11.7%</td><td class="num pos">7.7%</td></tr>
+        <tr><td>Trade Spans FOMC</td><td class="num">114</td><td class="num pos">82.5%</td><td class="num pos">+14.0%</td><td class="num pos">17.5%</td></tr>
+        <tr><td>Normal (no FOMC)</td><td class="num">411</td><td class="num">71.5%</td><td class="num">+8.4%</td><td class="num">28.5%</td></tr>
+      </tbody></table>
+      <div class="insight"><strong>Key insight:</strong> Don't OPEN on FOMC day. But trades already open that SPAN the FOMC date perform best (82.5% WR) — the post-event vol crush helps. Day-before entries (92.3% WR) capture this perfectly.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SEASONALITY -->
+<div class="section">
+  <div class="section-title">2 · Deadly Months <span class="badge badge-red">CRITICAL</span></div>
+  <div class="card danger">
+    <h3>Monthly Win Rate &amp; P/L %</h3>
+    <div class="chart-wrap" style="height:300px"><canvas id="monthlyChart" width="1270" height="300" style="display: block; box-sizing: border-box; height: 300px; width: 1270px;"></canvas></div>
+    <div class="insight"><strong>August, November, and December</strong> are devastating. Combined: <span class="highlight hl-red">106 trades, 50% loss rate, -0.71% avg P/L</span>. The other 9 months: <span class="highlight hl-green">381 trades, 76.4% win rate, +10.22% avg P/L</span>.</div>
+  </div>
+</div>
+
+<!-- RISK/REWARD -->
+<div class="section">
+  <div class="section-title">3 · Risk/Reward Ratio at Open <span class="badge badge-red">CRITICAL</span></div>
+  <div class="grid-2">
+    <div class="card danger">
+      <h3>Max Profit / |Max Loss| at Entry</h3>
+      <div class="chart-wrap"><canvas id="rrChart" width="598" height="280" style="display: block; box-sizing: border-box; height: 280px; width: 598px;"></canvas></div>
+    </div>
+    <div class="card warn">
+      <h3>The Most Predictive Factor</h3>
+      <table>
+        <tbody><tr><th>R:R Ratio</th><th>Trades</th><th>Win Rate</th><th>Loser %</th></tr>
+        <tr><td class="neg" style="font-weight:700">&lt; 0.5</td><td class="num">111</td><td class="num neg">24.3%</td><td class="num neg">75.7%</td></tr>
+        <tr><td class="warn-text">0.5 – 1.0</td><td class="num">73</td><td class="num">68.5%</td><td class="num warn-text">31.5%</td></tr>
+        <tr><td>1.0 – 1.5</td><td class="num">47</td><td class="num">65.9%</td><td class="num">34.0%</td></tr>
+        <tr><td class="pos">1.5 – 2.0</td><td class="num">41</td><td class="num pos">87.8%</td><td class="num pos">12.2%</td></tr>
+        <tr><td class="pos">2.0 – 3.0</td><td class="num">50</td><td class="num pos">96.0%</td><td class="num pos">4.0%</td></tr>
+        <tr><td class="pos" style="font-weight:700">3.0+</td><td class="num">148</td><td class="num pos">96.6%</td><td class="num pos">3.4%</td></tr>
+      </tbody></table>
+      <div class="insight">This is the <strong>single most predictive factor</strong>. When Max Profit / |Max Loss| &lt; 0.5, the trade has only a 24% chance of winning. Above 1.5, win rates jump to 88%+. This likely reflects entering after the market already moved against the setup.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VIX -->
+<div class="section">
+  <div class="section-title">4 · VIX Behavior <span class="badge badge-blue">IMPORTANT</span></div>
+  <div class="grid-2">
+    <div class="card danger">
+      <h3>VIX Spike During Trade (Open &lt;20, Close &gt;23)</h3>
+      <div class="finding bad"><span class="num-big neg">58.8%</span> loser rate when VIX spikes unexpectedly<br><span style="color:var(--dim)">vs 28.3% normally — a 2x increase in losses</span></div>
+      <div class="insight">"Above Delta" losers (worst category at -25.3% avg loss) almost always coincide with VIX spikes. The avg VIX change for those is <strong>+5.0 points</strong>. These 25 trades alone account for -$37,752 in losses.</div>
+    </div>
+    <div class="card info">
+      <h3>VIX Change During Trade vs Outcome</h3>
+      <div class="chart-wrap"><canvas id="vixChart" width="598" height="280" style="display: block; box-sizing: border-box; height: 280px; width: 598px;"></canvas></div>
+      <div class="insight">Sweet spot: <strong>VIX stable or up slightly (0 to +2)</strong> — 85.8% win rate. Big VIX drops (&gt;5 pts) are also bad — the market likely ripped hard in one direction, blowing through a short leg.</div>
+    </div>
+  </div>
+</div>
+
+<!-- DAY + TIME -->
+<div class="section">
+  <div class="section-title">5 · Day &amp; Time Patterns <span class="badge badge-blue">IMPORTANT</span></div>
+  <div class="grid-2">
+    <div class="card warn">
+      <h3>Day + Entry Time Heatmap</h3>
+      <table>
+        <tbody><tr><th>Day</th><th>9:45 AM Win%</th><th>9:45 Loser%</th><th>3:00 PM Win%</th><th>3:00 Loser%</th></tr>
+        <tr><td>Monday</td><td class="num">69.7%</td><td class="num">30.3%</td><td class="num pos">73.5%</td><td class="num">26.5%</td></tr>
+        <tr><td>Tuesday</td><td class="num">69.5%</td><td class="num">30.5%</td><td class="num">70.9%</td><td class="num">29.1%</td></tr>
+        <tr><td>Wednesday</td><td class="num">72.0%</td><td class="num">28.0%</td><td class="num">70.8%</td><td class="num">29.2%</td></tr>
+        <tr><td>Thursday</td><td class="num warn-text">64.7%</td><td class="num neg">35.3%</td><td class="num pos">80.4%</td><td class="num pos">19.6%</td></tr>
+        <tr><td class="neg" style="font-weight:700">Friday</td><td class="num pos">78.1%</td><td class="num pos">21.9%</td><td class="num neg">54.8%</td><td class="num neg">45.2%</td></tr>
+      </tbody></table>
+      <div class="insight"><strong>Friday at 3:00 PM</strong> is the worst slot: <span class="highlight hl-red">45.2% loser rate</span>. Weekend gap risk + baked-in theta = bad entry. Friday 9:45 AM is actually one of the best (78.1% WR).</div>
+    </div>
+    <div class="card info">
+      <h3>Opening Short/Long Ratio at Entry</h3>
+      <div class="chart-wrap"><canvas id="slrChart" width="598" height="280" style="display: block; box-sizing: border-box; height: 280px; width: 598px;"></canvas></div>
+      <div class="insight"><strong>SLR below 0.40</strong> = already off-balance: <span class="highlight hl-red">45.3% loser rate</span>. Sweet spot is SLR 0.55–0.70 (78–89% win rates).</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOLD + REGIME -->
+<div class="section">
+  <div class="section-title">6 · Hold Duration &amp; Market Regime <span class="badge badge-blue">IMPORTANT</span></div>
+  <div class="grid-2">
+    <div class="card warn">
+      <h3>Hold Duration</h3>
+      <table>
+        <tbody><tr><th>Duration</th><th>Trades</th><th>Win Rate</th><th>Avg P/L%</th><th>Loser %</th></tr>
+        <tr><td class="neg">1–3 days</td><td class="num">33</td><td class="num neg">60.6%</td><td class="num">+8.8%</td><td class="num neg">39.4%</td></tr>
+        <tr><td class="pos">4–5 days</td><td class="num">31</td><td class="num pos">77.4%</td><td class="num pos">+9.1%</td><td class="num pos">22.6%</td></tr>
+        <tr><td class="pos">6–7 days</td><td class="num">157</td><td class="num pos">76.4%</td><td class="num pos">+9.2%</td><td class="num pos">23.6%</td></tr>
+        <tr><td>8–10 days</td><td class="num">176</td><td class="num">72.7%</td><td class="num">+8.7%</td><td class="num">27.3%</td></tr>
+        <tr><td class="neg" style="font-weight:700">11–14 days</td><td class="num">77</td><td class="num neg">54.5%</td><td class="num neg">+1.0%</td><td class="num neg">45.5%</td></tr>
+      </tbody></table>
+      <div class="insight">Trades held <strong>11–14 days</strong> have a near coin-flip loss rate (45.5%) with pathetic +1.0% avg return. Sweet spot is 4–7 days.</div>
+    </div>
+    <div class="card info">
+      <h3>10-Day Market Direction at Entry</h3>
+      <table>
+        <tbody><tr><th>Regime</th><th>Trades</th><th>Win Rate</th><th>Avg P/L%</th><th>Loser %</th></tr>
+        <tr><td>Strong Down (&lt;-5%)</td><td class="num">31</td><td class="num">71.0%</td><td class="num pos">+10.6%</td><td class="num">29.0%</td></tr>
+        <tr><td>Mild Down</td><td class="num">53</td><td class="num pos">75.5%</td><td class="num pos">+9.0%</td><td class="num pos">24.5%</td></tr>
+        <tr><td>Flat (-2 to +2%)</td><td class="num">151</td><td class="num pos">72.8%</td><td class="num pos">+9.6%</td><td class="num">27.2%</td></tr>
+        <tr><td>Mild Up</td><td class="num">106</td><td class="num">70.8%</td><td class="num">+6.7%</td><td class="num">29.2%</td></tr>
+        <tr><td class="neg">Strong Up (&gt;+5%)</td><td class="num">131</td><td class="num neg">64.1%</td><td class="num neg">+5.0%</td><td class="num neg">35.9%</td></tr>
+      </tbody></table>
+      <div class="insight">After a <strong>strong 10-day rally (&gt;5% up)</strong>, the strategy struggles: 35.9% loser rate. Extended rallies push the call side into trouble. Mild pullbacks and flat markets are ideal.</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOSER ANATOMY -->
+<div class="section">
+  <div class="section-title">7 · Anatomy of a Loser <span class="badge badge-red">PATTERN</span></div>
+  <div class="card danger">
+    <h3>Winner vs Loser Profile</h3>
+    <div class="grid-2" style="margin-top:16px">
+      <table>
+        <tbody><tr><th>Metric</th><th>Winners</th><th>Losers</th></tr>
+        <tr><td>Avg Opening VIX</td><td class="num">19.26</td><td class="num">19.69</td></tr>
+        <tr><td>Avg VIX Change</td><td class="num pos">-0.17</td><td class="num neg">-1.61</td></tr>
+        <tr><td>Avg Opening SLR</td><td class="num pos">0.482</td><td class="num neg">0.464</td></tr>
+        <tr><td>Avg Hold Days</td><td class="num pos">7.7</td><td class="num neg">8.4</td></tr>
+        <tr><td>Avg Max Profit</td><td class="num pos">22.53</td><td class="num neg">7.78</td></tr>
+        <tr><td>Avg Max Loss</td><td class="num">-11.47</td><td class="num neg">-21.86</td></tr>
+      </tbody></table>
+      <div>
+        <div class="finding bad" style="margin:0">
+          <strong>Two flavors of catastrophe:</strong><br><br>
+          <strong style="color:var(--red)">"Above Delta" losers</strong> (25 trades, avg -25.3%): VIX spikes +5.0 pts. Market sells off, put spread blows up. Cluster in Feb + Aug.<br><br>
+          <strong style="color:var(--orange)">"Below Delta" losers</strong> (38 trades, avg -12.3%): VIX collapses -4.9 pts. Market rips up, call calendar gets crushed. Cluster in Aug + Nov.<br><br>
+          <strong style="color:var(--dim)">"Below SLR" losers</strong> (76 trades, avg -5.9%): Most common but least painful. Position slowly decays — manageable.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GOLDEN FILTER -->
+<div class="golden-box">
+  <h2>The Golden Filter</h2>
+  <p style="color:var(--dim);font-size:14px">4 simple rules that eliminate most losers while keeping the majority of winners.</p>
+  <div class="rules-grid" style="margin-top:20px;margin-bottom:24px">
+    <div class="rule"><div class="rule-num">1</div><h4>Skip Aug / Nov / Dec entirely</h4><p>These 3 months produce 50% losers and negative avg returns across all 3 years of data.</p><div class="impact">Eliminates ~50% loser-rate months</div></div>
+    <div class="rule"><div class="rule-num">2</div><h4>Don't open during FOMC week</h4><p>FOMC week entries have 34.2% loser rate and +4.9% avg P/L — well below baseline.</p><div class="impact">34.2% → 28.5% loser rate</div></div>
+    <div class="rule"><div class="rule-num">3</div><h4>Never open Friday at 3 PM</h4><p>45.2% of these trades lose. Weekend gap risk + baked-in theta decay = bad entry.</p><div class="impact">45.2% → 21.9% (use Fri 9:45 instead)</div></div>
+    <div class="rule"><div class="rule-num">4</div><h4>Require SLR ≥ 0.40 at entry</h4><p>Below 0.40 means the position is already skewed — 45.3% become losers.</p><div class="impact">45.3% → 27.7% loser rate</div></div>
+  </div>
+  <div class="compare">
+    <div class="compare-card">
+      <div class="label">Before (All Trades)</div>
+      <div class="big" style="color:var(--dim)">70.6%</div>
+      <div style="font-size:13px;color:var(--dim);margin-top:4px">Win Rate · 487 trades · 29.4% losers · +7.8% avg</div>
+    </div>
+    <div class="compare-card">
+      <div class="label">After Golden Filter</div>
+      <div class="big" style="color:var(--green)">80.2%</div>
+      <div style="font-size:13px;color:var(--green);margin-top:4px">Win Rate · 268 trades · 19.8% losers · +11.6% avg</div>
+    </div>
+  </div>
+  <p style="color:var(--dim);font-size:12px;margin-top:16px;text-align:center">You trade 45% less often but boost avg P/L from +7.8% to +11.6% and cut loser rate from 29.4% to 19.8%.</p>
+</div>
+
+<!-- EXTREME COMBOS -->
+<div class="section">
+  <div class="section-title">8 · Extreme Danger Combos <span class="badge badge-red">AVOID</span></div>
+  <div class="grid-3">
+    <div class="card danger"><h3>Aug/Nov/Dec + FOMC Week</h3><div class="finding bad"><span class="num-big neg">71.4%</span> loser rate<br><span style="color:var(--dim)">14 trades · -8.0% avg P/L</span></div></div>
+    <div class="card danger"><h3>VIX Spike (Open&lt;20 → Close&gt;23)</h3><div class="finding bad"><span class="num-big neg">58.8%</span> loser rate<br><span style="color:var(--dim)">17 trades · -5.1% avg P/L</span></div></div>
+    <div class="card danger"><h3>Hold &gt; 10 Days</h3><div class="finding bad"><span class="num-big neg">43.5%</span> loser rate<br><span style="color:var(--dim)">85 trades · +1.7% avg P/L</span></div></div>
+  </div>
+</div>
+
+<!-- LOSS CLUSTERS -->
+<div class="section">
+  <div class="section-title">9 · Worst Loss Clusters <span class="badge badge-blue">REFERENCE</span></div>
+  <div class="card info">
+    <table>
+      <tbody><tr><th>Period</th><th>Losers</th><th>Avg Loss %</th><th>Total $ Loss</th><th>Context</th></tr>
+      <tr><td>Aug 2023</td><td class="num neg">13</td><td class="num neg">-8.5%</td><td class="num neg">-$3,875</td><td style="font-size:12px;color:var(--dim)">FOMC Jul 26 + seasonal</td></tr>
+      <tr><td>Aug 2024</td><td class="num neg">11</td><td class="num neg">-15.9%</td><td class="num neg">-$4,836</td><td style="font-size:12px;color:var(--dim)">FOMC Jul 31 + VIX spike to 36</td></tr>
+      <tr><td>Oct 2023</td><td class="num neg">9</td><td class="num neg">-13.3%</td><td class="num neg">-$4,545</td><td style="font-size:12px;color:var(--dim)">Bond selloff, rising rates</td></tr>
+      <tr><td>Nov 2025</td><td class="num neg">9</td><td class="num neg">-5.1%</td><td class="num neg">-$30,813</td><td style="font-size:12px;color:var(--dim)">Scaled up + seasonal weakness</td></tr>
+      <tr><td>Dec 2025</td><td class="num neg">7</td><td class="num neg">-11.7%</td><td class="num neg">-$35,150</td><td style="font-size:12px;color:var(--dim)">FOMC Dec 17 + year-end</td></tr>
+      <tr><td>Apr 2024</td><td class="num neg">4</td><td class="num neg">-41.6%</td><td class="num neg">-$6,480</td><td style="font-size:12px;color:var(--dim)">Worst avg loss% — huge directional moves</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+</div>
+
+<script>
+const C={green:'#58e0a0',red:'#ff5c6c',blue:'#5cacff',orange:'#ffaa44',yellow:'#ffd644',dim:'#7a8494',grid:'#2a304060'};
+Chart.defaults.color=C.dim;Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=12;
+
+new Chart(document.getElementById('fomcChart'),{type:'bar',data:{labels:['FOMC Day','FOMC Week','Normal Days'],datasets:[{label:'Win Rate %',data:[50,65.8,71.5],backgroundColor:[C.red+'90',C.orange+'90',C.green+'90'],borderRadius:6},{label:'Loser %',data:[50,34.2,28.5],backgroundColor:[C.red+'40',C.orange+'40',C.green+'40'],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,padding:16}}},scales:{x:{grid:{display:false}},y:{grid:{color:C.grid},max:80,ticks:{callback:v=>v+'%'}}}}});
+
+new Chart(document.getElementById('monthlyChart'),{type:'bar',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Win Rate %',data:[77.6,77.1,76.7,76.9,75.6,85.7,72.7,50.9,83.3,64.3,50.0,46.7],backgroundColor:['#58e0a090','#58e0a090','#58e0a090','#58e0a090','#58e0a090','#58e0a090','#58e0a090','#ff5c6c90','#58e0a090','#ffaa4490','#ff5c6c90','#ff5c6c90'],borderRadius:6},{label:'Avg P/L %',data:[14.4,5.5,11.9,10.5,8.6,9.2,10.7,-1.0,13.4,6.8,0.1,-1.4],type:'line',borderColor:C.yellow,backgroundColor:C.yellow+'20',pointBackgroundColor:C.yellow,pointRadius:5,tension:.3,yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,padding:16}}},scales:{x:{grid:{display:false}},y:{grid:{color:C.grid},max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Win Rate %'}},y1:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%'},title:{display:true,text:'Avg P/L %'}}}}});
+
+new Chart(document.getElementById('rrChart'),{type:'bar',data:{labels:['< 0.5','0.5–1.0','1.0–1.5','1.5–2.0','2.0–3.0','3.0+'],datasets:[{label:'Win Rate %',data:[24.3,68.5,65.9,87.8,96.0,96.6],backgroundColor:[C.red,C.orange,C.orange,C.green+'cc',C.green,C.green],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},title:{display:true,text:'Max Profit / |Max Loss| at Entry'}},y:{grid:{color:C.grid},max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Win Rate %'}}}}});
+
+new Chart(document.getElementById('vixChart'),{type:'bar',data:{labels:['< -5','-5 to -2','-2 to 0','0 to +2','+2 to +5','> +5'],datasets:[{label:'Win Rate %',data:[32.1,57.0,75.0,85.8,79.4,54.2],backgroundColor:[C.red,C.orange+'cc',C.green+'99',C.green,C.green+'cc',C.orange],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},title:{display:true,text:'VIX Change During Trade'}},y:{grid:{color:C.grid},max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Win Rate %'}}}}});
+
+new Chart(document.getElementById('slrChart'),{type:'bar',data:{labels:['< 0.40','0.40–0.50','0.50–0.55','0.55–0.60','0.60–0.70','0.70+'],datasets:[{label:'Win Rate %',data:[55.4,72.3,69.6,77.5,89.5,66.7],backgroundColor:[C.red,C.blue+'cc',C.blue+'99',C.green+'cc',C.green,C.orange],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},title:{display:true,text:'Opening Short/Long Ratio'}},y:{grid:{color:C.grid},max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Win Rate %'}}}}});
+</script>
+
+
+</body></html>
